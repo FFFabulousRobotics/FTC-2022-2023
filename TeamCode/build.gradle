@@ -23,6 +23,9 @@ android {
     }
 }
 
+// for passing the sync process
+task prepareKotlinBuildScriptModel {}
+
 dependencies {
     implementation project(':FtcRobotController')
     annotationProcessor files('lib/OpModeAnnotationProcessor.jar')

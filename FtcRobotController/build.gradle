@@ -5,6 +5,11 @@ import java.text.SimpleDateFormat
 //
 apply plugin: 'com.android.library'
 
+// for passing the gradle sync process
+task prepareKotlinBuildScriptModel {
+
+}
+
 android {
 
     defaultConfig {
