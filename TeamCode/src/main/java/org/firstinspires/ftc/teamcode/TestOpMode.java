@@ -16,16 +16,14 @@ public class TestOpMode extends OpMode {
         DcMotor frontRight = hardwareMap.get(DcMotor.class, "FR");
         DcMotor backLeft = hardwareMap.get(DcMotor.class, "BL");
         DcMotor backRight = hardwareMap.get(DcMotor.class, "BR");
+        DcMotor armLeft = hardwareMap.get(DcMotor.class, "AL");
+        DcMotor armRight = hardwareMap.get(DcMotor.class, "AR");
+        DcMotor hand = hardwareMap.get(DcMotor.class, "HAND");
 
-        motorController = new MotorController(frontLeft, frontRight, backLeft, backRight);
+        motorController = new MotorController(frontLeft, frontRight, backLeft, backRight,
+                armLeft, armRight, hand);
         telemetry.addData("Status", "OpMode initialized!");
     }
-
-    @Override
-    public void init_loop() {}
-
-    @Override
-    public void start() {}
 
     @Override
     public void loop() {
@@ -50,6 +48,23 @@ public class TestOpMode extends OpMode {
             telemetry.addData("Turn", turn);
 
             motorController.move(vertical, horizontal, turn);
+
+            double arm = gamepad1.right_stick_y;
+            double hand;
+
+            if (gamepad1.dpad_up && !gamepad1.dpad_down) {
+                hand = 0.5;
+            } else if (gamepad1.dpad_down && !gamepad1.dpad_up) {
+                hand = -0.5;
+            } else {
+                hand = 0;
+            }
+
+            telemetry.addData("Arm", arm);
+            telemetry.addData("Hand", hand);
+
+            motorController.arm(arm);
+            motorController.hand(hand);
     }
 
     @Override

@@ -3,11 +3,16 @@ package org.firstinspires.ftc.teamcode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.util.Range;
 
+import java.util.stream.DoubleStream;
+
 public class MotorController {
     private final DcMotor frontLeft;
     private final DcMotor frontRight;
     private final DcMotor backLeft;
     private final DcMotor backRight;
+    private final DcMotor armLeft;
+    private final DcMotor armRight;
+    private final DcMotor hand;
 
     /**
      * The controller for the motors (with a mecanum wheels setup).
@@ -21,12 +26,19 @@ public class MotorController {
      * @param fr The front right {@link DcMotor}.
      * @param bl The back left {@link DcMotor}.
      * @param br The back right {@link DcMotor}.
+     * @param al The left arm {@link DcMotor}.
+     * @param ar The right arm
+     * @param hand The hand {@link DcMotor}.
      */
-    public MotorController(DcMotor fl, DcMotor fr, DcMotor bl, DcMotor br) {
+    public MotorController(DcMotor fl, DcMotor fr, DcMotor bl, DcMotor br, DcMotor al, DcMotor ar, DcMotor hand) {
         frontLeft = fl;
         frontRight = fr;
         backLeft = bl;
         backRight = br;
+
+        this.armLeft = al;
+        this.armRight = ar;
+        this.hand = hand;
 
         // set the direction so the code becomes more readable
         frontLeft.setDirection(DcMotor.Direction.REVERSE);
@@ -52,10 +64,12 @@ public class MotorController {
         rFront = (vertical - turn - horizontal);
         rBack = (vertical - turn + horizontal);
 
-        lFront = Range.clip(lFront, -1.0, 1.0);
-        lBack = Range.clip(lBack, -1.0, 1.0);
-        rFront = Range.clip(rFront, -1.0, 1.0);
-        rBack = Range.clip(rBack, -1.0, 1.0);
+        double[] scaledValues = arrayScale(lFront, lBack, rFront, rBack);
+
+        lFront = scaledValues[0];
+        lBack = scaledValues[1];
+        rFront = scaledValues[2];
+        rBack = scaledValues[3];
 
         frontLeft.setPower(lFront * k0);
         frontRight.setPower(rFront * k0);
@@ -71,5 +85,58 @@ public class MotorController {
         frontRight.setPower(0);
         backLeft.setPower(0);
         backRight.setPower(0);
+    }
+
+    /**
+     * Lift or retract the arm.
+     *
+     * @param speed Motor speed.
+     */
+    public void arm(double speed) {
+        double scaledSpeed = scale(speed);
+
+        armLeft.setPower(scaledSpeed);
+        armRight.setPower(scaledSpeed);
+    }
+
+    /**
+     * Turn the hand.
+     *
+     * @param speed Motor speed.
+     */
+    public void hand(double speed) {
+        double scaledSpeed = scale(speed);
+
+        hand.setPower(Range.clip(speed, -1.0, 1.0));
+    }
+
+    /**
+     * Scale the double value to [-1.0, 1.0].
+     *
+     * @param value The value to be scaled.
+     * @return The scaled value.
+     */
+    private double scale(double value) {
+        double absValue = Math.abs(value);
+
+        return Range.scale(value, -absValue, absValue, -1.0, 1.0);
+    }
+
+    /**
+     * Scale double values to [-1.0, 1.0] proportionally.
+     *
+     * @param values The values to be scaled.
+     * @return The scaled values array.
+     */
+    private double[] arrayScale(double... values) {
+        double maxAbs = DoubleStream.of(values).map(d -> Math.abs(d)).max().getAsDouble();
+
+        double[] scaledValues = new double[values.length];
+
+        for (int i = 0; i < values.length; i++) {
+            scaledValues[i] =  Range.scale(values[i], -maxAbs, maxAbs, -1.0, 1.0);
+        }
+
+        return scaledValues;
     }
 }
