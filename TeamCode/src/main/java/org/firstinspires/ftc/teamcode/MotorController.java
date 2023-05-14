@@ -10,8 +10,8 @@ public class MotorController {
     private final DcMotor frontRight;
     private final DcMotor backLeft;
     private final DcMotor backRight;
-    private final DcMotor armLeft;
-    private final DcMotor armRight;
+    private final DcMotor verticalArm;
+    private final DcMotor horizontalArm;
     private final DcMotor hand;
 
     /**
@@ -26,18 +26,18 @@ public class MotorController {
      * @param fr The front right {@link DcMotor}.
      * @param bl The back left {@link DcMotor}.
      * @param br The back right {@link DcMotor}.
-     * @param al The left arm {@link DcMotor}.
-     * @param ar The right arm
+     * @param va The vertical arm {@link DcMotor}.
+     * @param ha The horizontal arm {@link DcMotor}.
      * @param hand The hand {@link DcMotor}.
      */
-    public MotorController(DcMotor fl, DcMotor fr, DcMotor bl, DcMotor br, DcMotor al, DcMotor ar, DcMotor hand) {
+    public MotorController(DcMotor fl, DcMotor fr, DcMotor bl, DcMotor br, DcMotor va, DcMotor ha, DcMotor hand) {
         frontLeft = fl;
         frontRight = fr;
         backLeft = bl;
         backRight = br;
 
-        this.armLeft = al;
-        this.armRight = ar;
+        this.verticalArm = va;
+        this.horizontalArm = ha;
         this.hand = hand;
 
         // set the direction so the code becomes more readable
@@ -88,15 +88,25 @@ public class MotorController {
     }
 
     /**
-     * Lift or retract the arm.
+     * Lift or retract the vertical arm.
      *
      * @param speed Motor speed.
      */
-    public void arm(double speed) {
+    public void verticalArm(double speed) {
         double scaledSpeed = scale(speed);
 
-        armLeft.setPower(scaledSpeed);
-        armRight.setPower(scaledSpeed);
+        verticalArm.setPower(scaledSpeed);
+    }
+
+    /**
+     * Stretch or retract the horizontal arm.
+     *
+     * @param speed Motor speed.
+     */
+    public void horizontalArm(double speed) {
+        double scaledSpeed = scale(speed);
+
+        horizontalArm.setPower(scaledSpeed);
     }
 
     /**

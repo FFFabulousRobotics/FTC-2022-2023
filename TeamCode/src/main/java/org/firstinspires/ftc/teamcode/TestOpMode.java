@@ -49,21 +49,32 @@ public class TestOpMode extends OpMode {
 
             motorController.move(vertical, horizontal, turn);
 
-            double arm = gamepad1.right_stick_y;
+            double verticalArm = gamepad1.right_stick_y;
+            double horizontalArm;
             double hand;
 
-            if (gamepad1.dpad_up && !gamepad1.dpad_down) {
+            if (gamepad1.dpad_right && !gamepad1.dpad_left) {
                 hand = 0.5;
-            } else if (gamepad1.dpad_down && !gamepad1.dpad_up) {
+            } else if (gamepad1.dpad_left && !gamepad1.dpad_right) {
                 hand = -0.5;
             } else {
                 hand = 0;
             }
 
-            telemetry.addData("Arm", arm);
+            if (gamepad1.dpad_up && !gamepad1.dpad_down) {
+                horizontalArm = 0.5;
+            } else if (gamepad1.dpad_down &&!gamepad1.dpad_up) {
+                horizontalArm = -0.5;
+            } else {
+                horizontalArm = 0;
+            }
+
+            telemetry.addData("VerticalArm", verticalArm);
+            telemetry.addData("HorizontalArm", horizontalArm);
             telemetry.addData("Hand", hand);
 
-            motorController.arm(arm);
+            motorController.verticalArm(verticalArm);
+            motorController.horizontalArm(horizontalArm);
             motorController.hand(hand);
     }
 
