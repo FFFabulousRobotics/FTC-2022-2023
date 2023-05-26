@@ -1,18 +1,26 @@
 package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.Range;
 
+import java.util.OptionalDouble;
 import java.util.stream.DoubleStream;
 
 public class MotorController {
-    private final DcMotor frontLeft;
-    private final DcMotor frontRight;
-    private final DcMotor backLeft;
-    private final DcMotor backRight;
-    private final DcMotor verticalArm;
-    private final DcMotor horizontalArm;
-    private final DcMotor hand;
+    private final DcMotor frontLeft; // control hub motor 1
+    private final DcMotor frontRight; // control hub motor 0
+    private final DcMotor backLeft; // control hub motor 3
+    private final DcMotor backRight; // control hub motor 2
+    private final DcMotor verticalArm; // expansion hub motor 0
+    private final Servo sender; // expansion hub servo 0
+    private final DcMotor horizontalArm; // expansion hub motor 1
+    private final Servo angleServo; // expansion hub servo 2
+    private final Servo handServo; // expansion hub servo 1
+
+    public static final double k1 = 0.85; // move
+    public static final double k2 = 0.7; // vertical arm
+    public static final double k3 = 0.5;
 
     /**
      * The controller for the motors (with a mecanum wheels setup).
@@ -22,27 +30,35 @@ public class MotorController {
      * FL & BR: right + forward
      * FR & BL: left + forward
      *
-     * @param fl The front left {@link DcMotor}.
-     * @param fr The front right {@link DcMotor}.
-     * @param bl The back left {@link DcMotor}.
-     * @param br The back right {@link DcMotor}.
-     * @param va The vertical arm {@link DcMotor}.
-     * @param ha The horizontal arm {@link DcMotor}.
-     * @param hand The hand {@link DcMotor}.
+     * @param frontLeft The front left {@link DcMotor}.
+     * @param frontRight The front right {@link DcMotor}.
+     * @param backLeft The back left {@link DcMotor}.
+     * @param backRight The back right {@link DcMotor}.
      */
-    public MotorController(DcMotor fl, DcMotor fr, DcMotor bl, DcMotor br, DcMotor va, DcMotor ha, DcMotor hand) {
-        frontLeft = fl;
-        frontRight = fr;
-        backLeft = bl;
-        backRight = br;
+    public MotorController(
+            DcMotor frontLeft, DcMotor frontRight, DcMotor backLeft, DcMotor backRight,
+            DcMotor verticalArm, Servo sender,
+            DcMotor horizontalArm, Servo angleServo, Servo handServo) {
 
-        this.verticalArm = va;
-        this.horizontalArm = ha;
-        this.hand = hand;
+        this.frontLeft = frontLeft;
+        this.frontRight = frontRight;
+        this.backLeft = backLeft;
+        this.backRight = backRight;
 
-        // set the direction so the code becomes more readable
-        frontLeft.setDirection(DcMotor.Direction.REVERSE);
-        backLeft.setDirection(DcMotor.Direction.REVERSE);
+        this.verticalArm = verticalArm;
+        this.sender = sender;
+
+        this.horizontalArm = horizontalArm;
+        this.angleServo = angleServo;
+        this.handServo = handServo;
+
+        this.sender.setDirection(Servo.Direction.REVERSE);
+        this.frontLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        this.frontRight.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        this.backLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        this.backRight.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        this.verticalArm.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        this.angleServo.scaleRange(0.0, 1.0);
     }
 
     /**
@@ -57,24 +73,53 @@ public class MotorController {
         double lBack;
         double rFront;
         double rBack;
-        double k0 = 0.75;
 
-        lFront = -(vertical + turn + horizontal);
-        lBack = -(vertical + turn - horizontal);
-        rFront = (vertical - turn - horizontal);
-        rBack = (vertical - turn + horizontal);
+        lFront = (vertical + turn + horizontal);
+        lBack = (vertical + turn - horizontal);
+        rFront = -(vertical - turn - horizontal);
+        rBack = -(vertical - turn + horizontal);
 
-        double[] scaledValues = arrayScale(lFront, lBack, rFront, rBack);
+        double[] values = {lFront, lBack, rFront, rBack};
 
-        lFront = scaledValues[0];
-        lBack = scaledValues[1];
-        rFront = scaledValues[2];
-        rBack = scaledValues[3];
+        if (DoubleStream.of(values).map(Math::abs).anyMatch(d -> d > 1)) {
+            double[] scaledValues = arrayScale(lFront, lBack, rFront, rBack);
 
-        frontLeft.setPower(lFront * k0);
-        frontRight.setPower(rFront * k0);
-        backLeft.setPower(lBack * k0);
-        backRight.setPower(rBack * k0);
+            lFront = scaledValues[0];
+            lBack = scaledValues[1];
+            rFront = scaledValues[2];
+            rBack = scaledValues[3];
+        }
+
+        frontLeft.setPower(lFront * k1);
+        frontRight.setPower(rFront * k1);
+        backLeft.setPower(lBack * k1);
+        backRight.setPower(rBack * k1);
+    }
+
+    public void setVerticalArm(double speed) {
+        verticalArm.setPower(speed * k2);
+    }
+
+    public void send() {
+        sender.setPosition(0);
+    }
+
+    public void unsend() {
+        sender.setPosition(1);
+    }
+
+    public void setHorizontalArm(double speed) {
+        horizontalArm.setPower(speed * k3);
+    }
+
+    public void tilt(double angle) {
+        if (angleServo.getPosition() != angle) {
+            angleServo.setPosition(angle);
+        }
+    }
+
+    public void setHand(double angle) {
+        handServo.setPosition(angle);
     }
 
     /**
@@ -85,39 +130,6 @@ public class MotorController {
         frontRight.setPower(0);
         backLeft.setPower(0);
         backRight.setPower(0);
-    }
-
-    /**
-     * Lift or retract the vertical arm.
-     *
-     * @param speed Motor speed.
-     */
-    public void verticalArm(double speed) {
-        double scaledSpeed = scale(speed);
-
-        verticalArm.setPower(scaledSpeed);
-    }
-
-    /**
-     * Stretch or retract the horizontal arm.
-     *
-     * @param speed Motor speed.
-     */
-    public void horizontalArm(double speed) {
-        double scaledSpeed = scale(speed);
-
-        horizontalArm.setPower(scaledSpeed);
-    }
-
-    /**
-     * Turn the hand.
-     *
-     * @param speed Motor speed.
-     */
-    public void hand(double speed) {
-        double scaledSpeed = scale(speed);
-
-        hand.setPower(Range.clip(speed, -1.0, 1.0));
     }
 
     /**
@@ -139,14 +151,49 @@ public class MotorController {
      * @return The scaled values array.
      */
     private double[] arrayScale(double... values) {
-        double maxAbs = DoubleStream.of(values).map(d -> Math.abs(d)).max().getAsDouble();
+        OptionalDouble maxAbsOptional = DoubleStream.of(values).map(Math::abs).max();
+        if (!maxAbsOptional.isPresent())
+            return values;
+        double maxAbs = maxAbsOptional.getAsDouble();
 
         double[] scaledValues = new double[values.length];
 
         for (int i = 0; i < values.length; i++) {
-            scaledValues[i] =  Range.scale(values[i], -maxAbs, maxAbs, -1.0, 1.0);
+            scaledValues[i] = Range.scale(values[i], -maxAbs, maxAbs, -1.0, 1.0);
         }
 
         return scaledValues;
+    }
+
+    // fl, fr, bl, br
+    public int[] getWheels() {
+        return new int[] {
+                frontLeft.getCurrentPosition(),
+                frontRight.getCurrentPosition(),
+                backLeft.getCurrentPosition(),
+                backRight.getCurrentPosition()
+        };
+    }
+
+    // va, ha
+    public int[] getArms() {
+        return new int[] {
+                verticalArm.getCurrentPosition(),
+                horizontalArm.getCurrentPosition()
+        };
+    }
+
+    // sender, as, hs
+    public double[] getServos() {
+        return new double[] {
+                sender.getPosition(),
+                angleServo.getPosition(),
+                handServo.getPosition()
+        };
+    }
+
+    public void setArmsPosition(int verticalArmPosition, int horizontalArmPosition) {
+        verticalArm.setTargetPosition(verticalArmPosition);
+        horizontalArm.setTargetPosition(horizontalArmPosition);
     }
 }
