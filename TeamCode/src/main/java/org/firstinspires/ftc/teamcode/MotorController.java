@@ -18,9 +18,9 @@ public class MotorController {
     private final Servo angleServo; // expansion hub servo 2
     private final Servo handServo; // expansion hub servo 1
 
-    public static final double k1 = 0.85; // move
+    public static double k1 = 0.7; // move
     public static final double k2 = 0.7; // vertical arm
-    public static final double k3 = 0.5;
+    public static final double k3 = 0.5; // horizontal arm
 
     /**
      * The controller for the motors (with a mecanum wheels setup).
@@ -58,6 +58,7 @@ public class MotorController {
         this.backLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         this.backRight.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         this.verticalArm.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        this.horizontalArm.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         this.angleServo.scaleRange(0.0, 1.0);
     }
 
@@ -69,6 +70,10 @@ public class MotorController {
      * @param turn The angle velocity for turning. Set to positive for clockwise, negative for anti-clockwise.
      */
     public void move(double vertical, double horizontal, double turn) {
+        if (k1 == 0.1) {
+            turn = turn * 2;
+        }
+
         double lFront;
         double lBack;
         double rFront;
@@ -100,12 +105,8 @@ public class MotorController {
         verticalArm.setPower(speed * k2);
     }
 
-    public void send() {
-        sender.setPosition(0);
-    }
-
-    public void unsend() {
-        sender.setPosition(1);
+    public void setSender(double position) {
+        sender.setPosition(position);
     }
 
     public void setHorizontalArm(double speed) {
@@ -113,13 +114,11 @@ public class MotorController {
     }
 
     public void tilt(double angle) {
-        if (angleServo.getPosition() != angle) {
-            angleServo.setPosition(angle);
-        }
+        angleServo.setPosition(angle);
     }
 
-    public void setHand(double angle) {
-        handServo.setPosition(angle);
+    public void setHand(double position) {
+        handServo.setPosition(position);
     }
 
     /**
@@ -195,5 +194,21 @@ public class MotorController {
     public void setArmsPosition(int verticalArmPosition, int horizontalArmPosition) {
         verticalArm.setTargetPosition(verticalArmPosition);
         horizontalArm.setTargetPosition(horizontalArmPosition);
+    }
+
+    public void setSpeedMode(SpeedMode mode) {
+        switch (mode) {
+            case SLOW:
+                k1 = 0.1;
+                break;
+            case FAST:
+                k1 = 0.7;
+                break;
+        }
+    }
+
+    enum SpeedMode {
+        SLOW,
+        FAST
     }
 }

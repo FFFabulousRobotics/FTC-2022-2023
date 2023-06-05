@@ -5,20 +5,29 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.Servo;
 
-import org.firstinspires.ftc.robotcore.external.navigation.VuforiaLocalizer;
-import org.firstinspires.ftc.robotcore.external.navigation.VuforiaTrackables;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.stream.DoubleStream;
 
 @TeleOp
 public class ManualOpMode extends OpMode {
 
     MotorController motorController;
-    VuforiaLocalizer vuforia;
-    VuforiaTrackables targets;
+
+    double TRIGGER_TURNING = 0.5;
+    double RIGHT_STICK_X_SIGNIFICANCE = 0.15;
+    double RIGHT_STICK_Y_SIGNIFICANCE = 0.1;
+    double HAND_SERVO_TIGHTNESS = 0.25;
+    double ANGLE_SERVO_IDLE = 0.6;
+    double ANGLE_SERVO_FLAT = 0.2;
+    double ANGLE_SERVO_UP = 0.9;
+
+    GamepadStorage previousGamepad;
 
     int[] wheelsOG;
     int[] armsOG;
-
-    boolean left_bumper_previous;
+    int[] dWheels;
+    int[] dArms;
 
     @Override
     public void init() {
@@ -39,7 +48,10 @@ public class ManualOpMode extends OpMode {
         wheelsOG = motorController.getWheels();
         armsOG = motorController.getArms();
 
-        left_bumper_previous = false;
+        previousGamepad = new GamepadStorage();
+
+        motorController.tilt(0.6);
+        telemetry.addData("Tilt", "idle");
 
         telemetry.addData("Status", "OpMode initialized!");
     }
@@ -51,31 +63,43 @@ public class ManualOpMode extends OpMode {
 
     @Override
     public void loop() {
-        // get the gamepad values
-        double k0 = 0.5;
+        int[] wheels = motorController.getWheels();
+        int[] arms = motorController.getArms();
+        double[] servos = motorController.getServos();
+        double[] servosRounded =
+                DoubleStream.of(servos)
+                        .map(x ->
+                                BigDecimal.valueOf(x).setScale(2, RoundingMode.HALF_UP).doubleValue()
+                        ).toArray();
 
-        double vertical = gamepad1.left_stick_y * k0;
-        double horizontal = -gamepad1.left_stick_x * k0;
+        int[] dWheels = {
+                wheels[0] - wheelsOG[0],
+                wheels[1] - wheelsOG[1],
+                wheels[2] - wheelsOG[2],
+                wheels[3] - wheelsOG[3]
+        };
+        int[] dArms = {
+                arms[0] - armsOG[0],
+                arms[1] - armsOG[1]
+        };
+
+        // get the gamepad values
+        double vertical = gamepad1.left_stick_y;
+        double horizontal = -gamepad1.left_stick_x;
         double turn;
 
         if (gamepad1.left_trigger > 0 && gamepad1.right_trigger == 0) {
-            turn = -gamepad1.left_trigger * 0.5;
+            turn = -gamepad1.left_trigger * TRIGGER_TURNING;
         } else if (gamepad1.right_trigger > 0 && gamepad1.left_trigger == 0) {
-            turn = gamepad1.right_trigger * 0.5;
+            turn = gamepad1.right_trigger * TRIGGER_TURNING;
         } else {
             turn = 0;
         }
 
-        if (gamepad1.dpad_up && !gamepad1.dpad_down) {
-            vertical = -0.01;
-        } else if (gamepad1.dpad_down && !gamepad1.dpad_up) {
-            vertical = 0.01;
-        }
-
-        if (gamepad1.dpad_left && !gamepad1.dpad_right) {
-            horizontal = 0.005;
-        } else if (gamepad1.dpad_right && !gamepad1.dpad_left) {
-            horizontal = -0.005;
+        if (gamepad1.left_bumper) {
+            motorController.setSpeedMode(MotorController.SpeedMode.SLOW);
+        } else {
+            motorController.setSpeedMode(MotorController.SpeedMode.FAST);
         }
 
         // for debug
@@ -91,22 +115,21 @@ public class ManualOpMode extends OpMode {
         double absRX = Math.abs(gamepad1.right_stick_x);
         double absRY = Math.abs(gamepad1.right_stick_y);
 
-        double ySignificance = 0.1;
-        double xSignificance = 0.15;
-
-        if (gamepad1.right_stick_button) {
-            verticalArm = -0.1;
-            horizontalArm = 0.1;
-        } else if (absRY >= ySignificance && absRX < xSignificance) {
+        if (absRY >= RIGHT_STICK_Y_SIGNIFICANCE && absRX < RIGHT_STICK_X_SIGNIFICANCE) {
             verticalArm = gamepad1.right_stick_y;
             horizontalArm = 0;
-        } else if (absRX >= xSignificance && absRY < ySignificance) {
+        } else if (absRX >= RIGHT_STICK_X_SIGNIFICANCE && absRY < RIGHT_STICK_Y_SIGNIFICANCE) {
             verticalArm = 0;
             horizontalArm = gamepad1.right_stick_x;
         } else {
-            verticalArm = 0;
+            if (dArms[0] >= 2000) {
+                verticalArm = -0.1;
+            } else {
+                verticalArm = 0;
+            }
             horizontalArm = 0;
         }
+
 
         telemetry.addData("VerticalArm", verticalArm);
         telemetry.addData("HorizontalArm", horizontalArm);
@@ -115,42 +138,45 @@ public class ManualOpMode extends OpMode {
         motorController.setHorizontalArm(horizontalArm);
 
         if (gamepad1.a) {
-            motorController.send();
+            motorController.setSender(0);
             telemetry.addData("Sender", "send");
+        } else if (dArms[0] > 0) {
+            motorController.setSender(0.5);
         } else {
-            motorController.unsend();
+            motorController.setSender(1);
             telemetry.addData("Sender", "not send");
         }
 
-        if (gamepad1.b) {
-            motorController.setHand(1);
-            telemetry.addData("Hand", "opened");
-        } else {
-            motorController.setHand(0.3);
-            telemetry.addData("Hand", "closed");
+        if (gamepad1.b && !previousGamepad.b) {
+            if (servosRounded[2] == HAND_SERVO_TIGHTNESS) {
+                motorController.setHand(1);
+                telemetry.addData("Hand", "opened");
+            } else {
+                motorController.setHand(HAND_SERVO_TIGHTNESS);
+                telemetry.addData("Hand", "closed");
+            }
         }
 
-        if (gamepad1.x && !gamepad1.y) {
-            motorController.tilt(1);
-            telemetry.addData("Tilt", "tilted");
-        } else if (gamepad1.y && !gamepad1.x) {
-            motorController.tilt(0.11);
-            telemetry.addData("Tilt", "flat");
-        } else {
-            motorController.tilt(0.6);
-            telemetry.addData("Tilt", "idle");
+        if (gamepad1.y && !previousGamepad.y) {
+            if (servosRounded[1] == ANGLE_SERVO_FLAT) {
+                motorController.tilt(ANGLE_SERVO_IDLE);
+                telemetry.addData("Tilt", "idle");
+            } else {
+                motorController.tilt(ANGLE_SERVO_FLAT);
+                telemetry.addData("Tilt", "flat");
+            }
+        }
+        if (gamepad1.x && !previousGamepad.x) {
+            if (servosRounded[1] == ANGLE_SERVO_UP) {
+                motorController.tilt(ANGLE_SERVO_IDLE);
+                telemetry.addData("Tilt", "idle");
+            } else {
+                motorController.tilt(ANGLE_SERVO_UP);
+                telemetry.addData("Tilt", "up");
+            }
         }
 
-
-        int[] wheels = motorController.getWheels();
-        int[] arms = motorController.getArms();
-        double[] servos = motorController.getServos();
-
-        if (gamepad1.left_bumper && !left_bumper_previous) {
-            motorController.setArmsPosition(arms[0], armsOG[1] - 800);
-            telemetry.addData("extend", "yes");
-        }
-        left_bumper_previous = gamepad1.left_bumper;
+        previousGamepad.store(gamepad1);
 
         telemetry.addLine("------------------------------------");
 
@@ -168,13 +194,13 @@ public class ManualOpMode extends OpMode {
 
         telemetry.addLine("------------------------------------");
 
-        telemetry.addData("D FrontLeft", wheels[0] - wheelsOG[0]);
-        telemetry.addData("D FrontRight", wheels[1] - wheelsOG[1]);
-        telemetry.addData("D BackLeft", wheels[2] - wheelsOG[2]);
-        telemetry.addData("D BackRight", wheels[3] - wheelsOG[3]);
+        telemetry.addData("D FrontLeft", dWheels[0]);
+        telemetry.addData("D FrontRight", dWheels[1]);
+        telemetry.addData("D BackLeft", dWheels[2]);
+        telemetry.addData("D BackRight", dWheels[3]);
 
-        telemetry.addData("D VerticalArm", arms[0] - armsOG[0]);
-        telemetry.addData("D HorizontalArm", arms[1] - armsOG[1]);
+        telemetry.addData("D VerticalArm", dArms[0]);
+        telemetry.addData("D HorizontalArm", dArms[1]);
     }
 
     @Override
